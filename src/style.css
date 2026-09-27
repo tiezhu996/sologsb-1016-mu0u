@@ -61,6 +61,20 @@ h3 { margin: 3px 0 0; font-size: 21px; }
 .scene-meta-grid { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 4px 12px; padding: 16px 18px 3px; border: 1px solid #252f40; border-radius: 12px; background: #121824; }
 .scene-meta-grid .span-2, .cue-grid .span-4 { grid-column: span 2; }
 .cue-grid .span-4 { grid-column: 1 / -1; }
+.cast-panel { margin-top: 14px; padding: 15px 18px 16px; border: 1px solid #252f40; border-radius: 12px; background: #121824; }
+.cast-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+.cast-heading h3 { margin: 3px 0 0; font-size: 16px; }
+.cast-heading small { color: #68768e; font-size: 11px; text-align: right; }
+.cast-rows { display: grid; gap: 8px; }
+.cast-row { display: grid; grid-template-columns: 160px minmax(150px, 1fr) auto; align-items: center; gap: 10px; }
+.cast-row.inactive { opacity: .55; }
+.cast-role { display: grid; min-width: 0; }
+.cast-role strong { font-size: 13px; }
+.cast-role small { color: #68768e; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.follow-tag { opacity: .65; }
+.cast-card { padding: 13px; border: 1px solid #293346; border-radius: 10px; background: #141b28; display: grid; gap: 9px; }
+.cast-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cast-card-head strong { font-size: 13px; }
 .timeline-heading { margin: 26px 0 13px; }
 .cue-list { display: grid; gap: 10px; }
 .cue-card { display: grid; grid-template-columns: 28px minmax(0, 1fr); border: 1px solid #293346; border-left: 3px solid #657188; border-radius: 11px; background: #131a27; overflow: hidden; transition: .15s ease; }
@@ -118,6 +132,9 @@ h3 { margin: 3px 0 0; font-size: 21px; }
   .title-input { width: 100%; font-size: 25px; margin-top: 7px; }
   .scene-order-actions { margin-top: 12px; }
   .scene-meta-grid { grid-template-columns: 1fr 1fr; }
+  .cast-row { grid-template-columns: 1fr; }
+  .cast-heading { display: block; }
+  .cast-heading small { display: block; text-align: left; margin-top: 4px; }
   .cue-grid { grid-template-columns: 1fr 1fr; }
   .cue-topline { flex-wrap: wrap; }
   .review-column { padding: 18px 14px; }

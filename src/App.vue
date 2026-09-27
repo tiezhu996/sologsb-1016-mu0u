@@ -33,6 +33,9 @@ const {
   updateProject,
   updateScene,
   updateCue,
+  setSceneActor,
+  updateCharacterActor,
+  actorOf,
   addScene,
   deleteScene,
   addCue,
@@ -67,6 +70,7 @@ const rateOptions: Array<{ label: string; value: Rate }> = [
   { label: '快 1.2×', value: 1.2 }
 ]
 const characterOptions = computed(() => state.value.document.characters.map((item) => ({ label: `${item.name} / ${item.voiceActor}`, value: item.id })))
+const actorOptions = computed(() => [...new Set(state.value.document.characters.map((item) => item.voiceActor).filter(Boolean))].map((name) => ({ label: name, value: name })))
 const effectOptions = computed(() => state.value.document.soundEffects.map((item) => ({ label: `${item.name} (${item.duration}s)`, value: item.id })))
 const themeOverrides = {
   common: {
@@ -95,6 +99,27 @@ function cueName(cue: Cue) {
   if (cue.kind === 'dialogue') return state.value.document.characters.find((item) => item.id === cue.characterId)?.name ?? '未指定角色'
   if (cue.kind === 'sfx') return state.value.document.soundEffects.find((item) => item.id === cue.soundEffectId)?.name ?? '缺失音效'
   return '转场'
+}
+
+function cueActor(cue: Cue) {
+  if (cue.kind !== 'dialogue' || !selectedScene.value) return ''
+  return actorOf(state.value.document, selectedScene.value, cue.characterId)
+}
+
+function cueActorPinned(cue: Cue) {
+  return Boolean(cue.characterId && selectedScene.value?.castOverrides?.[cue.characterId]?.trim())
+}
+
+function sceneOverride(characterId: string) {
+  return selectedScene.value?.castOverrides?.[characterId] ?? null
+}
+
+function characterInScene(characterId: string) {
+  return Boolean(selectedScene.value?.cues.some((cue) => cue.kind === 'dialogue' && cue.characterId === characterId))
+}
+
+function pinnedScenesOf(characterId: string) {
+  return state.value.document.scenes.filter((scene) => scene.castOverrides?.[characterId]?.trim()).map((scene) => scene.code)
 }
 
 function sceneStatus(sceneId: string) {
@@ -272,6 +297,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <n-form-item label="场次转场" class="span-2"><n-input :value="selectedScene.transition" @update:value="updateScene(selectedScene.id, 'transition', $event)" /></n-form-item>
           </div>
 
+          <div class="cast-panel">
+            <div class="cast-heading">
+              <div>
+                <span class="eyebrow">SCENE CAST</span>
+                <h3>本场配音指派</h3>
+              </div>
+              <small>未指派的角色沿用角色资料；可输入名册外演员，清空即恢复沿用</small>
+            </div>
+            <div class="cast-rows">
+              <div
+                v-for="character in state.document.characters"
+                :key="character.id"
+                class="cast-row"
+                :class="{ inactive: !characterInScene(character.id) }"
+              >
+                <span class="cast-role">
+                  <strong>{{ character.name }}</strong>
+                  <small>资料 · {{ character.voiceActor || '未定' }}{{ characterInScene(character.id) ? '' : ' · 本场无台词' }}</small>
+                </span>
+                <n-select
+                  size="small"
+                  clearable
+                  filterable
+                  tag
+                  :value="sceneOverride(character.id)"
+                  :options="actorOptions"
+                  :placeholder="`沿用资料 · ${character.voiceActor || '未定'}`"
+                  @update:value="setSceneActor(selectedScene.id, character.id, $event)"
+                />
+                <n-tag v-if="sceneOverride(character.id)" size="small" type="warning" :bordered="false">本场指定</n-tag>
+                <n-tag v-else size="small" :bordered="false" class="follow-tag">沿用资料</n-tag>
+              </div>
+            </div>
+          </div>
+
           <div class="timeline-heading">
             <div>
               <span class="eyebrow">TIMELINE</span>
@@ -302,6 +362,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   <span class="cue-number">{{ String(index + 1).padStart(2, '0') }}</span>
                   <n-select class="kind-select" size="small" :value="cue.kind" :options="kindOptions" @update:value="changeCueKind(cue, $event)" />
                   <n-tag size="small" :bordered="false">{{ cueName(cue) }}</n-tag>
+                  <n-tag
+                    v-if="cue.kind === 'dialogue' && cueActor(cue)"
+                    size="small"
+                    :bordered="false"
+                    :type="cueActorPinned(cue) ? 'warning' : 'default'"
+                  >配音 {{ cueActor(cue) }}{{ cueActorPinned(cue) ? ' · 本场' : '' }}</n-tag>
                   <span class="duration-pill">{{ durationOfCue(cue).toFixed(1) }}s</span>
                   <n-button size="tiny" tertiary type="error" @click="deleteCue(cue.id)">删除</n-button>
                 </div>
@@ -379,6 +445,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   </div>
                 </div>
                 <n-empty v-if="!pendingCount" description="所有修改都已确认" />
+              </div>
+            </n-tab-pane>
+
+            <n-tab-pane name="cast" tab="角色">
+              <div class="pending-toolbar">
+                <n-alert type="info" :show-icon="false">资料中的演员是全剧默认。修改后，未单独指派的场次会跟随；已指派的场次保持本场指定不变。</n-alert>
+              </div>
+              <div class="review-list">
+                <div v-for="character in state.document.characters" :key="character.id" class="cast-card">
+                  <div class="cast-card-head">
+                    <strong>{{ character.name }}</strong>
+                    <n-tag v-if="pinnedScenesOf(character.id).length" size="small" type="warning" :bordered="false">本场指定：{{ pinnedScenesOf(character.id).join('、') }}</n-tag>
+                    <n-tag v-else size="small" :bordered="false" class="follow-tag">全部沿用资料</n-tag>
+                  </div>
+                  <n-input size="small" :value="character.voiceActor" placeholder="配音演员" @update:value="updateCharacterActor(character.id, $event)">
+                    <template #prefix>配音</template>
+                  </n-input>
+                </div>
+                <n-empty v-if="!state.document.characters.length" description="还没有角色资料" />
               </div>
             </n-tab-pane>
 
