@@ -39,6 +39,7 @@ export const sampleDocument: StudioDocument = {
     },
     {
       id: 'scene-3', code: 'S03', title: '潮痕', location: '防波堤', timeOfDay: '清晨', transition: '尾声 · 留白', durationLimit: 170,
+      voiceOverrides: { 'char-landlord': '吴涛' },
       cues: [
         { id: 'cue-3-1', kind: 'dialogue', characterId: 'char-lin', text: '信里只有一张旧船票，还有你的名字。', emotion: '疲惫 / 试探', rate: 0.9, transition: '' },
         { id: 'cue-3-2', kind: 'dialogue', characterId: 'char-gu', text: '名字是我写的，船票不是。有人想让我们同时回到这里。', emotion: '克制 / 不安', rate: 0.9, transition: '' },

@@ -59,6 +59,25 @@ h3 { margin: 3px 0 0; font-size: 21px; }
 .title-input:focus { border-bottom-color: #73daca; }
 .scene-order-actions, .add-actions { display: flex; gap: 7px; }
 .scene-meta-grid { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 4px 12px; padding: 16px 18px 3px; border: 1px solid #252f40; border-radius: 12px; background: #121824; }
+.cast-panel { margin-top: 12px; padding: 14px 18px 12px; border: 1px solid #252f40; border-radius: 12px; background: #101623; }
+.cast-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.cast-heading h4 { margin: 0; font-size: 14px; }
+.cast-heading small { margin-left: auto; color: #657188; font-size: 11px; }
+.cast-rows { display: grid; gap: 7px; }
+.cast-row { display: grid; grid-template-columns: 86px 110px minmax(140px, 1fr) 64px; align-items: center; gap: 10px; }
+.cast-role { padding: 3px 8px; border-left: 3px solid #657188; color: #dfe7f4; font-size: 12px; font-weight: 700; }
+.cast-default { color: #657188; font-size: 11px; }
+.cast-follow { color: #55617a; font-size: 11px; text-align: right; }
+.actor-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: #182031; color: #9fb2cf; font-size: 11px; white-space: nowrap; }
+.actor-pill.overridden { color: #ffc777; background: rgba(255, 199, 119, .1); }
+.actor-pill i { font-style: normal; font-size: 10px; opacity: .8; }
+.roster { margin: 22px 5px 0; padding: 13px 12px; display: grid; gap: 8px; border: 1px solid #253044; border-radius: 9px; background: #111827; }
+.roster-heading h3 { margin: 2px 0 4px; font-size: 13px; }
+.roster-row { display: grid; grid-template-columns: 10px 1fr 1fr; align-items: center; gap: 7px; }
+.roster-dot { width: 8px; height: 8px; border-radius: 50%; }
+.roster-name, .roster-actor { width: 100%; min-width: 0; padding: 4px 6px; color: #dfe7f4; background: #0e1420; border: 1px solid #253044; border-radius: 6px; font-size: 12px; outline: 0; }
+.roster-name { font-weight: 700; }
+.roster-name:focus, .roster-actor:focus { border-color: #73daca; }
 .scene-meta-grid .span-2, .cue-grid .span-4 { grid-column: span 2; }
 .cue-grid .span-4 { grid-column: 1 / -1; }
 .timeline-heading { margin: 26px 0 13px; }
@@ -118,6 +137,9 @@ h3 { margin: 3px 0 0; font-size: 21px; }
   .title-input { width: 100%; font-size: 25px; margin-top: 7px; }
   .scene-order-actions { margin-top: 12px; }
   .scene-meta-grid { grid-template-columns: 1fr 1fr; }
+  .cast-row { grid-template-columns: 70px 1fr; }
+  .cast-select { grid-column: 1 / -1; }
+  .cast-follow { text-align: left; }
   .cue-grid { grid-template-columns: 1fr 1fr; }
   .cue-topline { flex-wrap: wrap; }
   .review-column { padding: 18px 14px; }

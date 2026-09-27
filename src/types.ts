@@ -36,6 +36,8 @@ export interface Scene {
   timeOfDay: string
   transition: string
   durationLimit: number
+  /** 本场临时配音指派：角色 id → 演员名；未指派的角色沿用资料里的演员 */
+  voiceOverrides?: Record<string, string>
   cues: Cue[]
 }
 

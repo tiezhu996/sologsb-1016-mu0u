@@ -35,6 +35,13 @@ export function useStudio() {
 
   const selectedScene = computed(() => state.value.document.scenes.find((scene) => scene.id === selectedSceneId.value) ?? state.value.document.scenes[0])
 
+  /** 某一场里某个角色实际使用的演员：本场指派优先，未指派沿用角色资料 */
+  function resolveActor(document: StudioDocument, scene: Scene, characterId?: string): string {
+    const character = document.characters.find((item) => item.id === characterId)
+    if (!character) return ''
+    return scene.voiceOverrides?.[character.id]?.trim() || character.voiceActor
+  }
+
   function durationOfCue(cue: Cue): number {
     if (cue.manualDuration !== undefined) return cue.manualDuration
     if (cue.kind === 'sfx') {
@@ -60,10 +67,11 @@ export function useStudio() {
       for (const cue of scene.cues) {
         if (cue.kind === 'dialogue' && cue.characterId) {
           const character = state.value.document.characters.find((item) => item.id === cue.characterId)
-          if (character) {
-            const roles = actorRoles.get(character.voiceActor) ?? []
+          const actor = resolveActor(state.value.document, scene, cue.characterId)
+          if (character && actor) {
+            const roles = actorRoles.get(actor) ?? []
             roles.push(character.name)
-            actorRoles.set(character.voiceActor, roles)
+            actorRoles.set(actor, roles)
           }
         }
         if (cue.kind === 'sfx' && cue.soundEffectId && !state.value.document.soundEffects.some((effect) => effect.id === cue.soundEffectId)) {
@@ -87,7 +95,7 @@ export function useStudio() {
             level: 'error',
             sceneId: scene.id,
             title: `${scene.code} 角色撞场`,
-            detail: `${actor} 同时为 ${uniqueRoles.join('、')} 配音；同场角色需拆分演员或调整台词。`
+            detail: `按本场实际指派，${actor} 同时为 ${uniqueRoles.join('、')} 配音；同场角色需拆分演员或调整台词。`
           })
         }
       })
@@ -166,6 +174,31 @@ export function useStudio() {
       if (field === 'durationLimit') scene.durationLimit = Number(value)
       else if (field === 'code' || field === 'title' || field === 'location' || field === 'timeOfDay' || field === 'transition') scene[field] = String(value)
     })
+  }
+
+  function setSceneVoice(sceneId: string, characterId: string, actor: string | null) {
+    const scene = state.value.document.scenes.find((item) => item.id === sceneId)
+    const character = state.value.document.characters.find((item) => item.id === characterId)
+    if (!scene || !character) return
+    const trimmed = actor?.trim() ?? ''
+    const label = trimmed
+      ? `${scene.code} 临时指派 ${character.name} 由 ${trimmed} 配音`
+      : `${scene.code} 恢复 ${character.name} 沿用资料配音`
+    commit(label, (document) => {
+      const target = document.scenes.find((item) => item.id === sceneId)
+      if (!target) return
+      if (!target.voiceOverrides) target.voiceOverrides = {}
+      if (trimmed) target.voiceOverrides[characterId] = trimmed
+      else delete target.voiceOverrides[characterId]
+    }, trimmed ? `仅本场生效，其他场次仍沿用 ${character.voiceActor}` : '')
+  }
+
+  function updateCharacter(characterId: string, field: 'name' | 'voiceActor', value: string) {
+    const character = state.value.document.characters.find((item) => item.id === characterId)
+    commit(`更新角色资料 ${character?.name ?? ''}`, (document) => {
+      const target = document.characters.find((item) => item.id === characterId)
+      if (target) target[field] = value
+    }, field === 'voiceActor' ? '未做本场指派的场次将跟随新演员' : '')
   }
 
   function updateCue(cueId: string, field: keyof Cue, value: string | number | undefined) {
@@ -324,12 +357,23 @@ export function useStudio() {
       lines.push(`场景：${scene.location} / ${scene.timeOfDay}`)
       lines.push(`转场：${scene.transition}`)
       lines.push(`场次限额：${scene.durationLimit} 秒｜预计：${durationOfScene(scene)} 秒`)
+      const castIds = [...new Set(scene.cues.filter((cue) => cue.kind === 'dialogue' && cue.characterId).map((cue) => cue.characterId as string))]
+      if (castIds.length) {
+        const cast = castIds.map((id) => {
+          const character = document.characters.find((item) => item.id === id)
+          if (!character) return '未指定角色'
+          const overridden = Boolean(scene.voiceOverrides?.[character.id]?.trim())
+          return `${character.name}→${resolveActor(document, scene, id)}${overridden ? '（本场指派）' : ''}`
+        })
+        lines.push(`本场配音：${cast.join('、')}`)
+      }
       lines.push('-'.repeat(34))
       scene.cues.forEach((cue, cueIndex) => {
         const prefix = `${String(cueIndex + 1).padStart(2, '0')} [${durationOfCue(cue).toFixed(1)}s]`
         if (cue.kind === 'dialogue') {
           const role = document.characters.find((character) => character.id === cue.characterId)?.name ?? '未指定角色'
-          lines.push(`${prefix} ${role}｜${cue.emotion || '自然'}｜语速 ${cue.rate}`)
+          const actor = resolveActor(document, scene, cue.characterId) || '未定演员'
+          lines.push(`${prefix} ${role}（${actor}）｜${cue.emotion || '自然'}｜语速 ${cue.rate}`)
           lines.push(`    ${cue.text}`)
         } else if (cue.kind === 'sfx') {
           const effect = document.soundEffects.find((item) => item.id === cue.soundEffectId)
@@ -375,9 +419,12 @@ export function useStudio() {
     saveState,
     durationOfCue,
     durationOfScene,
+    resolveActor,
     updateProject,
     updateScene,
     updateCue,
+    setSceneVoice,
+    updateCharacter,
     addScene,
     deleteScene,
     addCue,

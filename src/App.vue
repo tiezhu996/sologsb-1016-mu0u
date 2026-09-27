@@ -30,9 +30,12 @@ const {
   saveState,
   durationOfCue,
   durationOfScene,
+  resolveActor,
   updateProject,
   updateScene,
   updateCue,
+  setSceneVoice,
+  updateCharacter,
   addScene,
   deleteScene,
   addCue,
@@ -68,6 +71,31 @@ const rateOptions: Array<{ label: string; value: Rate }> = [
 ]
 const characterOptions = computed(() => state.value.document.characters.map((item) => ({ label: `${item.name} / ${item.voiceActor}`, value: item.id })))
 const effectOptions = computed(() => state.value.document.soundEffects.map((item) => ({ label: `${item.name} (${item.duration}s)`, value: item.id })))
+const actorOptions = computed(() => {
+  const names = new Set<string>()
+  for (const character of state.value.document.characters) names.add(character.voiceActor)
+  for (const scene of state.value.document.scenes) {
+    for (const actor of Object.values(scene.voiceOverrides ?? {})) names.add(actor)
+  }
+  return [...names].filter(Boolean).map((name) => ({ label: name, value: name }))
+})
+/** 当前场次出现台词的角色及其本场实际演员 */
+const sceneCast = computed(() => {
+  const scene = selectedScene.value
+  if (!scene) return []
+  const ids = [...new Set(scene.cues.filter((cue) => cue.kind === 'dialogue' && cue.characterId).map((cue) => cue.characterId as string))]
+  return ids
+    .map((id) => {
+      const character = state.value.document.characters.find((item) => item.id === id)
+      if (!character) return null
+      return {
+        character,
+        override: scene.voiceOverrides?.[id] ?? '',
+        actor: resolveActor(state.value.document, scene, id)
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+})
 const themeOverrides = {
   common: {
     primaryColor: '#73daca',
@@ -95,6 +123,15 @@ function cueName(cue: Cue) {
   if (cue.kind === 'dialogue') return state.value.document.characters.find((item) => item.id === cue.characterId)?.name ?? '未指定角色'
   if (cue.kind === 'sfx') return state.value.document.soundEffects.find((item) => item.id === cue.soundEffectId)?.name ?? '缺失音效'
   return '转场'
+}
+
+function cueActor(cue: Cue) {
+  if (cue.kind !== 'dialogue' || !selectedScene.value) return ''
+  return resolveActor(state.value.document, selectedScene.value, cue.characterId)
+}
+
+function cueActorOverridden(cue: Cue) {
+  return Boolean(cue.characterId && selectedScene.value?.voiceOverrides?.[cue.characterId]?.trim())
 }
 
 function sceneStatus(sceneId: string) {
@@ -242,6 +279,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <span class="scene-duration">{{ durationOfScene(scene).toFixed(0) }}s</span>
             </button>
           </div>
+          <div class="roster">
+            <div class="roster-heading">
+              <span class="eyebrow">CAST SHEET</span>
+              <h3>角色资料</h3>
+            </div>
+            <div v-for="character in state.document.characters" :key="character.id" class="roster-row">
+              <span class="roster-dot" :style="{ background: character.color }"></span>
+              <input class="roster-name" :value="character.name" aria-label="角色名" @change="updateCharacter(character.id, 'name', ($event.target as HTMLInputElement).value)" />
+              <input class="roster-actor" :value="character.voiceActor" aria-label="配音演员" placeholder="配音演员" @change="updateCharacter(character.id, 'voiceActor', ($event.target as HTMLInputElement).value)" />
+            </div>
+          </div>
           <div class="sidebar-tip">
             <strong>键盘工作流</strong>
             <span>[ / ] 切换场次</span>
@@ -270,6 +318,33 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <n-form-item label="时间"><n-input :value="selectedScene.timeOfDay" @update:value="updateScene(selectedScene.id, 'timeOfDay', $event)" /></n-form-item>
             <n-form-item label="场次限额（秒）"><n-input-number :value="selectedScene.durationLimit" :min="5" :step="5" @update:value="updateScene(selectedScene.id, 'durationLimit', $event ?? 0)" /></n-form-item>
             <n-form-item label="场次转场" class="span-2"><n-input :value="selectedScene.transition" @update:value="updateScene(selectedScene.id, 'transition', $event)" /></n-form-item>
+          </div>
+
+          <div v-if="sceneCast.length" class="cast-panel">
+            <div class="cast-heading">
+              <span class="eyebrow">CASTING</span>
+              <h4>本场配音指派</h4>
+              <small>未指派的沿用角色资料；清空选择即恢复沿用</small>
+            </div>
+            <div class="cast-rows">
+              <div v-for="entry in sceneCast" :key="entry.character.id" class="cast-row">
+                <span class="cast-role" :style="{ borderColor: entry.character.color }">{{ entry.character.name }}</span>
+                <span class="cast-default">资料：{{ entry.character.voiceActor }}</span>
+                <n-select
+                  class="cast-select"
+                  size="small"
+                  clearable
+                  filterable
+                  tag
+                  :value="entry.override || null"
+                  :options="actorOptions"
+                  :placeholder="`沿用资料：${entry.character.voiceActor}`"
+                  @update:value="setSceneVoice(selectedScene.id, entry.character.id, $event)"
+                />
+                <n-tag v-if="entry.override" size="tiny" type="warning" :bordered="false">本场指派</n-tag>
+                <span v-else class="cast-follow">沿用资料</span>
+              </div>
+            </div>
           </div>
 
           <div class="timeline-heading">
@@ -302,6 +377,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   <span class="cue-number">{{ String(index + 1).padStart(2, '0') }}</span>
                   <n-select class="kind-select" size="small" :value="cue.kind" :options="kindOptions" @update:value="changeCueKind(cue, $event)" />
                   <n-tag size="small" :bordered="false">{{ cueName(cue) }}</n-tag>
+                  <span v-if="cue.kind === 'dialogue'" class="actor-pill" :class="{ overridden: cueActorOverridden(cue) }" :title="cueActorOverridden(cue) ? '本场临时指派' : '沿用角色资料'">
+                    🎙 {{ cueActor(cue) || '未定演员' }}<i v-if="cueActorOverridden(cue)">本场</i>
+                  </span>
                   <span class="duration-pill">{{ durationOfCue(cue).toFixed(1) }}s</span>
                   <n-button size="tiny" tertiary type="error" @click="deleteCue(cue.id)">删除</n-button>
                 </div>
